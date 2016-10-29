@@ -108,7 +108,7 @@ def softmax_loss_vectorized(W, X, y, reg):
 
     # Compute dScores with derivative trick
     correct_label_matrix = np.zeros(margins.shape)
-    # Matrix is all zeros except for
+    # All zeros, except where y = k
     correct_label_matrix[range(num_train),y] = 1
     dScores = (margins - correct_label_matrix).T
 
