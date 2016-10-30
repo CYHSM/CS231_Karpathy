@@ -111,7 +111,7 @@ def softmax_loss_vectorized(W, X, y, reg):
     # All zeros, except where y = k
     correct_label_matrix[range(num_train),y] = 1
     dScores = (margins - correct_label_matrix).T
-
+    # or dScores[range(num_train),y] -= 1 instead of using correct_label_matrix
     # Calculate gradient on scores
     dW = dScores.dot(X).T
 

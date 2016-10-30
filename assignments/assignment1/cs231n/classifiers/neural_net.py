@@ -1,3 +1,4 @@
+import ipdb
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -68,15 +69,15 @@ class TwoLayerNet(object):
     N, D = X.shape
 
     # Compute the forward pass
-    scores = None
     #############################################################################
     # TODO: Perform the forward pass, computing the class scores for the input. #
     # Store the result in the scores variable, which should be an array of      #
     # shape (N, C).                                                             #
     #############################################################################
     scores_hidden = X.dot(W1) + b1 # Dimensions (NxD . DxH) = (NxH)
-    scores_last_layer = scores_hidden.dot(W2) + b2 # Dimensions (NxH . HxC) = (NxC)
-    scores = scores_last_layer
+    scores_hidden_after_relu = np.maximum(scores_hidden,np.zeros(scores_hidden.shape)) # max(0,x) Dimensions (NxH)
+    scores_last_layer = scores_hidden_after_relu.dot(W2) + b2 # Dimensions (NxH . HxC) = (NxC)
+    scores = scores_last_layer # Dimensions (NxC)
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -86,7 +87,6 @@ class TwoLayerNet(object):
       return scores
 
     # Compute the loss
-    loss = None
     #############################################################################
     # TODO: Finish the forward pass, and compute the loss. This should include  #
     # both the data loss and L2 regularization for W1 and W2. Store the result  #
@@ -94,10 +94,18 @@ class TwoLayerNet(object):
     # classifier loss. So that your results match ours, multiply the            #
     # regularization loss by 0.5                                                #
     #############################################################################
-    exp_scores = np.exp(scores)
-    probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
-    correct_class_scores = exp_scores[y]
-    loss = correct_class_scores / np.sum(exp_scores)
+    # Calculate correct class score for each sample
+    correct_class_scores = scores[range(N),y]
+    # Calculate loss without numerical problems
+    logC = -np.max(scores, axis=1)
+    p = np.exp(correct_class_scores + logC) / np.sum(np.exp(scores + logC[:,np.newaxis]), axis=1)
+    loss = np.sum(-np.log(p))
+    # Right now the loss is a sum over all training examples, but we want it
+    # to be an average instead so we divide by num_train.
+    loss /= N
+    # Add regularization to the loss, for both W1 and W2
+    loss += 0.5 * reg * np.sum(W1 * W1)
+    loss += 0.5 * reg * np.sum(W2 * W2)
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -109,7 +117,35 @@ class TwoLayerNet(object):
     # and biases. Store the results in the grads dictionary. For example,       #
     # grads['W1'] should store the gradient on W1, and be a matrix of same size #
     #############################################################################
-    pass
+    # Compute margins without numerical problems
+    margins_l2 = np.exp(scores + logC[:,np.newaxis]) / np.sum(np.exp(scores + logC[:,np.newaxis]), axis=1)[:,np.newaxis]
+    dScores_l2 = margins_l2
+    dScores_l2[range(N),y] -= 1
+    # Calculate gradient on scores
+
+    #ipdb.set_trace()  ######### Break Point ###########
+    dW2 = dScores_l2.T.dot(scores_hidden_after_relu) # Gradient on weights in hidden layer (W2)
+    db2 = np.sum(dScores_l2, axis=0) # Gradient on bias in hidden layer
+    dl2 = dScores_l2.dot(W2.T)
+
+    # Calculate for first layer
+    dScores_l1 = dl2
+    dScores_l1[scores_hidden<0] = 0 # Backward pass through ReLU. Inactivated neurons wont route the gradient further
+    dW1 = dScores_l1.T.dot(X)
+    db1 = np.sum(dScores_l1, axis=0)
+    dl1 = dScores_l1.dot(W1.T)
+
+    dW2 /= N
+    dW2 += reg * W2.T
+    dW1 /= N
+    dW1 += reg * W1.T
+    db1 /= N
+    db2 /= N
+
+    grads['W1'] = dW1.T
+    grads['b1'] = db1
+    grads['W2'] = dW2.T
+    grads['b2'] = db2
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -219,3 +255,20 @@ class TwoLayerNet(object):
     ###########################################################################
 
     return y_pred
+
+# Test neural_net.py
+# nn = TwoLayerNet(4, 3, 2)
+# x_in = np.array([1,2,0,4])
+# w1 = np.array([[0.1,0.5,0.2],[0,0.1,0.2],[0.2,0.1,0],[0.5,0.1,0.1]])
+# b1 = np.array([0,0,0])
+# w2 = np.array([[0.5,0.1],[0.5,0.2],[0.2,0.5]])
+# b2 = np.array([0,0])
+# y = 1
+# nn.params['W1'] = w1
+# nn.params['b1'] = b1
+# nn.params['W2'] = w2
+# nn.params['b2'] = b2
+#
+# loss, dw = nn.loss(x_in[np.newaxis,:],y=y)
+# print(loss)
+# print(dw)
